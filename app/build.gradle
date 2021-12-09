@@ -92,7 +92,6 @@ dependencies {
     kapt "com.google.dagger:hilt-compiler:$hilt_version"
 
     implementation 'info.guardianproject:tor-android:0.4.6.7'
-    implementation 'info.guardianproject:jtorctl:0.4.5.7'
 
     def ktor_version = '1.6.5'
     implementation "io.ktor:ktor-server-core:$ktor_version"

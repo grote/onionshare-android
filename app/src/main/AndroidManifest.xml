@@ -29,10 +29,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Adding android:process=":tor" here prevents us from binding to the service -->
         <service
             android:name="org.onionshare.android.tor.OnionService"
-            android:exported="false" />
+            android:exported="false"
+            android:process=":tor" />
 
     </application>
 

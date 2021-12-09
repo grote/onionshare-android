@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.os.IBinder
+import android.os.Process
 import androidx.core.content.ContextCompat.startForegroundService
 import net.freehaven.tor.control.TorControlCommands.EVENT_CIRCUIT_STATUS
 import net.freehaven.tor.control.TorControlCommands.EVENT_ERR_MSG
@@ -22,6 +23,9 @@ import org.slf4j.LoggerFactory.getLogger
 import org.torproject.jni.TorService
 import org.torproject.jni.TorService.ACTION_STATUS
 import org.torproject.jni.TorService.EXTRA_STATUS
+import org.torproject.jni.TorService.getControlSocketFileDescriptor
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.IOException
 import java.util.Collections
 import javax.inject.Inject
@@ -45,18 +49,17 @@ private val EVENTS = listOf(
 class TorManager @Inject constructor(
     private val app: Application,
 ) {
-    private var torService: OnionService? = null
+    private var binder: IBinder? = null
     private var broadcastReceiver: BroadcastReceiver? = null
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
             LOG.info("OnionService connected")
-            val binder = service as OnionService.OnionBinder
-            torService = binder.service
+            this@TorManager.binder = binder
         }
 
         override fun onServiceDisconnected(arg0: ComponentName) {
             LOG.info("OnionService disconnected")
-            torService = null
+            binder = null
         }
     }
 
@@ -65,26 +68,31 @@ class TorManager @Inject constructor(
      * Suspends until the address of the onion service is available.
      */
     suspend fun start(port: Int): String = suspendCoroutine { continuation ->
+        LOG.info("Starting...")
         broadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, i: Intent) {
                 when (i.getStringExtra(EXTRA_STATUS)) {
                     TorService.STATUS_STARTING -> LOG.debug("TorService: Starting...")
                     TorService.STATUS_ON -> {
-                        // we are receiving a broadcast from the service, it must be set
-                        val service = torService!!
                         LOG.debug("TorService: Started")
-                        try {
-                            // the control connection is only guaranteed to be available here
-                            // see: https://github.com/guardianproject/tor-android/issues/56
-                            service.torControlConnection.setEvents(EVENTS)
-                            service.torControlConnection.addRawEventListener { keyword, data ->
-                                LOG.debug("$keyword: $data")
+                        val controlFileDescriptor = getControlSocketFileDescriptor(context)
+                        val inputStream = FileInputStream(controlFileDescriptor)
+                        val outputStream = FileOutputStream(controlFileDescriptor)
+                        TorControlConnection(inputStream, outputStream).apply {
+                            try {
+                                launchThread(true)
+                                authenticate(ByteArray(0))
+                                setEvents(EVENTS)
+                                addRawEventListener { keyword, data ->
+                                    LOG.debug("$keyword: $data")
+                                }
+                            } catch (e: Exception) {
+                                // gets caught and logged by caller
+                                continuation.resumeWithException(e)
+                                return
                             }
-                        } catch (e: Exception) {
-                            // gets caught and logged by caller
-                            continuation.resumeWithException(e)
+                            createOnionService(this, continuation, port)
                         }
-                        createOnionService(service.torControlConnection, continuation, port)
                     }
                     // FIXME When we stop unplanned, we need to inform the ShareManager
                     //  that we stopped, so it can clear its state up, stopping webserver, etc.
@@ -96,6 +104,7 @@ class TorManager @Inject constructor(
         app.registerReceiver(broadcastReceiver, IntentFilter(ACTION_STATUS))
 
         Intent(app, OnionService::class.java).also { intent ->
+            intent.putExtra(TorService.EXTRA_PID, Process.myPid())
             startForegroundService(app, intent)
             app.bindService(intent, serviceConnection, BIND_AUTO_CREATE)
         }
@@ -106,8 +115,8 @@ class TorManager @Inject constructor(
         LOG.info("Stopping...")
         // FIXME TorService crashes us when getting destroyed a second time
         //  see: https://github.com/guardianproject/tor-android/issues/57
-        if (torService != null) app.unbindService(serviceConnection)
-        torService = null
+        if (binder != null) app.unbindService(serviceConnection)
+        binder = null
         // simply unbinding doesn't seem sufficient for stopping a foreground service
         Intent(app, OnionService::class.java).also { intent ->
             app.stopService(intent)
