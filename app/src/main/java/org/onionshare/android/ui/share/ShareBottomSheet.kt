@@ -35,6 +35,9 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Alignment.Companion.CenterVertically
 import androidx.compose.ui.Modifier
@@ -51,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.onionshare.android.R
 import org.onionshare.android.ui.StyledLegacyText
+import org.onionshare.android.ui.theme.Error
 import org.onionshare.android.ui.theme.IndicatorReady
 import org.onionshare.android.ui.theme.IndicatorSharing
 import org.onionshare.android.ui.theme.IndicatorStarting
@@ -87,10 +91,20 @@ private fun getBottomSheetUi(state: ShareUiState) = when (state) {
         stateText = R.string.share_state_transfer_complete,
         buttonText = R.string.share_button_complete,
     )
-    is ShareUiState.Error -> BottomSheetUi(
+    is ShareUiState.Stopping -> BottomSheetUi(
+        indicatorColor = IndicatorStarting,
+        stateText = R.string.share_state_stopping,
+        buttonText = R.string.share_button_stopping,
+    )
+    is ShareUiState.ErrorAddingFile -> BottomSheetUi(
         indicatorColor = IndicatorReady,
         stateText = R.string.share_state_ready,
         buttonText = R.string.share_button_start,
+    )
+    is ShareUiState.Error -> BottomSheetUi(
+        indicatorColor = Error,
+        stateText = R.string.share_state_error,
+        buttonText = R.string.share_button_error,
     )
     is ShareUiState.NoFiles -> error("No bottom sheet in empty state.")
 }
@@ -173,9 +187,19 @@ fun BottomSheet(state: ShareUiState, onSheetButtonClicked: () -> Unit) {
                 }
             }
             Divider(thickness = 2.dp)
+        } else if (state is ShareUiState.Error) {
+            Text(
+                text = stringResource(R.string.share_state_error_text),
+                modifier = Modifier.padding(16.dp),
+            )
+            Divider(thickness = 2.dp)
         }
+        var buttonEnabled by remember(state) { mutableStateOf(state !is ShareUiState.Stopping) }
         Button(
-            onClick = onSheetButtonClicked,
+            onClick = {
+                buttonEnabled = false
+                onSheetButtonClicked()
+            },
             colors = if (state is ShareUiState.Sharing) {
                 ButtonDefaults.buttonColors(contentColor = MaterialTheme.colors.OnionRed,
                     backgroundColor = MaterialTheme.colors.surface)
@@ -187,6 +211,7 @@ fun BottomSheet(state: ShareUiState, onSheetButtonClicked: () -> Unit) {
             elevation = ButtonDefaults.elevation(
                 defaultElevation = 0.dp,
             ),
+            enabled = buttonEnabled,
             modifier = Modifier
                 .padding(16.dp)
                 .fillMaxWidth(),
@@ -273,6 +298,32 @@ fun ShareBottomSheetCompletePreview() {
         Surface(color = MaterialTheme.colors.background) {
             BottomSheet(
                 state = ShareUiState.Complete(emptyList()),
+                onSheetButtonClicked = {},
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ShareBottomSheetStoppingPreview() {
+    OnionshareTheme {
+        Surface(color = MaterialTheme.colors.background) {
+            BottomSheet(
+                state = ShareUiState.Stopping(emptyList()),
+                onSheetButtonClicked = {},
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, uiMode = UI_MODE_NIGHT_YES)
+@Composable
+fun ShareBottomSheetErrorPreview() {
+    OnionshareTheme {
+        Surface(color = MaterialTheme.colors.background) {
+            BottomSheet(
+                state = ShareUiState.Error(emptyList()),
                 onSheetButtonClicked = {},
             )
         }
