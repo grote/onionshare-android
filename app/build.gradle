@@ -103,8 +103,10 @@ dependencies {
     implementation "com.google.dagger:hilt-android:$hilt_version"
     kapt "com.google.dagger:hilt-compiler:$hilt_version"
 
-    implementation 'info.guardianproject:tor-android:0.4.6.10'
-    implementation 'info.guardianproject:jtorctl:0.4.5.7'
+    implementation 'info.guardianproject:tor-android:0.4.6.10-2-ga7980c0a@aar'
+    implementation 'org.briarproject:jtorctl:0.5'
+//    implementation 'info.guardianproject:tor-android:0.4.6.10'
+//    implementation 'info.guardianproject:jtorctl:0.4.5.7'
 
     def ktor_version = '1.6.5'
     implementation "io.ktor:ktor-server-core:$ktor_version"

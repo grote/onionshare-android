@@ -6,21 +6,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.Intent.EXTRA_TEXT
 import android.content.IntentFilter
-import android.net.LocalSocket
-import android.net.LocalSocketAddress
-import android.net.LocalSocketAddress.Namespace.FILESYSTEM
+import android.util.Log
 import androidx.annotation.UiThread
 import androidx.core.content.ContextCompat.startForegroundService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
-import net.freehaven.tor.control.RawEventListener
-import net.freehaven.tor.control.TorControlCommands.EVENT_CIRCUIT_STATUS
-import net.freehaven.tor.control.TorControlCommands.EVENT_ERR_MSG
-import net.freehaven.tor.control.TorControlCommands.EVENT_HS_DESC
-import net.freehaven.tor.control.TorControlCommands.EVENT_STATUS_CLIENT
-import net.freehaven.tor.control.TorControlCommands.EVENT_WARN_MSG
+import net.freehaven.tor.control.EventHandler
 import net.freehaven.tor.control.TorControlCommands.HS_ADDRESS
 import net.freehaven.tor.control.TorControlConnection
 import org.onionshare.android.server.PORT
@@ -42,11 +35,11 @@ import kotlin.math.roundToInt
 
 private val LOG = getLogger(TorManager::class.java)
 private val EVENTS = listOf(
-    EVENT_CIRCUIT_STATUS, // this one is needed for TorService to function
-    EVENT_HS_DESC,
-    EVENT_STATUS_CLIENT,
-    EVENT_WARN_MSG,
-    EVENT_ERR_MSG,
+    "CIRC", // this one is needed for TorService to function
+    "HS_DESC",
+    "STATUS_CLIENT",
+    "WARN",
+    "ERR",
 )
 private val BOOTSTRAP_REGEX = Regex("^NOTICE BOOTSTRAP PROGRESS=([0-9]{1,3}) .*$")
 
@@ -93,32 +86,55 @@ class TorManager @Inject constructor(
 
     @Volatile
     private var controlConnection: TorControlConnection? = null
-    private val onionListener = RawEventListener { keyword, data ->
-        // TODO consider removing the logging below before release
-        LOG.debug("$keyword: $data")
-        // bootstrapping gets 70% of our progress
-        if (keyword == EVENT_STATUS_CLIENT) {
-            val matchResult = BOOTSTRAP_REGEX.matchEntire(data)
-            val percent = matchResult?.groupValues?.get(1)?.toIntOrNull()
-            if (percent != null) {
-                val progress = (percent * 0.7).roundToInt()
-                val newState = (state.value as? TorState.Starting)?.copy(progress = progress)
-                    ?: TorState.Starting(progress)
-                _state.value = newState
-            }
-            return@RawEventListener
+    private val onionListener = object : EventHandler {
+        override fun circuitStatus(keyword: String?, circID: String?, path: String?) {
         }
-        val onion = (state.value as? TorState.Starting)?.onion
-        // descriptor upload counts as 90%
-        if (state.value !is TorState.Started) {
-            if (onion != null && keyword == EVENT_HS_DESC && data.startsWith("UPLOAD $onion")) {
-                _state.value = TorState.Starting(90, onion)
+
+        override fun streamStatus(status: String?, streamID: String?, target: String?) {
+        }
+
+        override fun orConnStatus(status: String?, orName: String?) {
+        }
+
+        override fun bandwidthUsed(read: Long, written: Long) {
+        }
+
+        override fun newDescriptors(orList: MutableList<String>?) {
+        }
+
+        override fun message(severity: String?, msg: String?) {
+        }
+
+        override fun unrecognized(keyword: String?, data: String) {
+            // TODO consider removing the logging below before release
+            LOG.debug("$keyword: $data")
+            // bootstrapping gets 70% of our progress
+            if (keyword == "STATUS_CLIENT") {
+                val matchResult = BOOTSTRAP_REGEX.matchEntire(data)
+                val percent = matchResult?.groupValues?.get(1)?.toIntOrNull()
+                if (percent != null) {
+                    val progress = (percent * 0.7).roundToInt()
+                    val newState = (state.value as? TorState.Starting)?.copy(progress = progress)
+                        ?: TorState.Starting(progress)
+                    _state.value = newState
+                }
+            }
+            val onion = (state.value as? TorState.Starting)?.onion
+            // descriptor upload counts as 90%
+            if (state.value !is TorState.Started) {
+                if (onion != null && keyword == "HS_DESC" && data.startsWith("UPLOAD $onion")) {
+                    _state.value = TorState.Starting(90, onion)
+                }
+            }
+            // We consider already the first upload of the onion descriptor as started (100%).
+            // In practice, more uploads are needed for the onion service to be reachable.
+            if (onion != null && keyword == "HS_DESC" && data.startsWith("UPLOADED $onion")) {
+                _state.value = TorState.Started(onion)
             }
         }
-        // We consider already the first upload of the onion descriptor as started (100%).
-        // In practice, more uploads are needed for the onion service to be reachable.
-        if (onion != null && keyword == EVENT_HS_DESC && data.startsWith("UPLOADED $onion")) {
-            _state.value = TorState.Started(onion)
+
+        override fun controlConnectionClosed() {
+            Log.e("TEST", "CONTROL CONNECTION CLOSED!!!")
         }
     }
 
@@ -176,7 +192,7 @@ class TorManager @Inject constructor(
     private suspend fun onTorServiceStarted() = withContext(Dispatchers.IO) {
         _state.value = TorState.Starting(5)
         controlConnection = startControlConnection().apply {
-            addRawEventListener(onionListener)
+            setEventHandler(onionListener)
             // create listeners as the first thing to prevent modification while already receiving events
             launchThread(true)
             authenticate(ByteArray(0))
@@ -204,14 +220,14 @@ class TorManager @Inject constructor(
     @Throws(IOException::class)
     @Suppress("BlockingMethodInNonBlockingContext")
     private suspend fun startControlConnection(): TorControlConnection = withContext(Dispatchers.IO) {
-        val localSocketAddress = LocalSocketAddress(getControlPath(), FILESYSTEM)
-        val client = LocalSocket()
-        client.connect(localSocketAddress)
-        client.receiveBufferSize = 1024 * 8
-        client.sendBufferSize = 1024 * 8
-        client.soTimeout = 0 // if we time out, the control connection gets closed and Tor will stop since we own it
+//        val localSocketAddress = LocalSocketAddress(getControlPath(), FILESYSTEM)
+//        val client = LocalSocket()
+//        client.connect(localSocketAddress)
+//        client.receiveBufferSize = 1024 * 8
+//        client.sendBufferSize = 1024 * 8
+//        client.soTimeout = 0 // if we time out, the control connection gets closed and Tor will stop since we own it
 
-        val controlFileDescriptor = client.fileDescriptor
+        val controlFileDescriptor = TorService.getControlSocketFileDescriptor(app) //client.fileDescriptor
         val inputStream = FileInputStream(controlFileDescriptor)
         val outputStream = FileOutputStream(controlFileDescriptor)
         TorControlConnection(inputStream, outputStream)
