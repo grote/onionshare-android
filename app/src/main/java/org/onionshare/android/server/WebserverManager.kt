@@ -12,6 +12,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStarted
 import io.ktor.server.application.ApplicationStopped
+import io.ktor.server.application.ApplicationStopping
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.engine.ApplicationEngine
@@ -29,8 +30,12 @@ import io.ktor.server.response.respondFile
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.security.SecureRandom
 import java.util.concurrent.RejectedExecutionException
@@ -43,16 +48,17 @@ internal const val PORT: Int = 17638
 sealed class WebServerState {
     object Starting : WebServerState()
     object Started : WebServerState()
-    object DownloadComplete : WebServerState()
-    object Stopped : WebServerState()
+    data class Stopping(val downloadComplete: Boolean = false) : WebServerState()
+    data class Stopped(val downloadComplete: Boolean) : WebServerState()
 }
 
 @Singleton
+@OptIn(DelicateCoroutinesApi::class)
 class WebserverManager @Inject constructor() {
 
     private val secureRandom = SecureRandom()
     private var server: ApplicationEngine? = null
-    private val _state = MutableStateFlow<WebServerState>(WebServerState.Stopped)
+    private val _state = MutableStateFlow<WebServerState>(WebServerState.Stopped(false))
     val state = _state.asStateFlow()
 
     fun start(sendPage: SendPage) {
@@ -60,7 +66,10 @@ class WebserverManager @Inject constructor() {
         val staticPath = getStaticPath()
         val staticPathMap = mapOf("static_url_path" to staticPath)
         TrafficStats.setThreadStatsTag(0x42)
-        server = embeddedServer(Netty, PORT, watchPaths = emptyList()) {
+        server = embeddedServer(Netty, PORT, watchPaths = emptyList(), configure = {
+            // disable response timeout
+            responseWriteTimeoutSeconds = 0
+        }) {
             install(CallLogging)
             install(Pebble) {
                 loader(ClasspathLoader().apply { prefix = "assets/templates" })
@@ -74,16 +83,22 @@ class WebserverManager @Inject constructor() {
         }.also { it.start() }
     }
 
-    fun stop() {
-        LOG.info("Stopping...")
+    fun stop(isFinishingDownloading: Boolean = false) {
+        LOG.info("Stopping... (isFinishingDownloading: $isFinishingDownloading)")
         try {
-            server?.stop(500, 1_000)
+            // Netty doesn't start to really shut down until gracePeriodMillis is over.
+            // So we can't use Long.MAX_VALUE for this or the server will never stop.
+            // But downloading a file seems to submit new tasks, so the gracePeriodMillis needs to cover the entire
+            // download. If the grace-period is over too soon, the download tasks get rejected and the server stops
+            // before the download could finish.
+            val timeout = if (isFinishingDownloading) {
+                _state.value = WebServerState.Stopping(true)
+                120_000L
+            } else 500L
+            server?.stop(timeout, timeout * 2)
         } catch (e: RejectedExecutionException) {
             LOG.warn("Error while stopping webserver", e)
-        } finally {
-            server = null
         }
-        LOG.info("Stopped")
     }
 
     private fun getStaticPath(): String {
@@ -97,8 +112,15 @@ class WebserverManager @Inject constructor() {
         environment.monitor.subscribe(ApplicationStarted) {
             _state.value = WebServerState.Started
         }
+        environment.monitor.subscribe(ApplicationStopping) {
+            // only update if we are not already stopping
+            if (state.value !is WebServerState.Stopping) _state.value = WebServerState.Stopping()
+        }
         environment.monitor.subscribe(ApplicationStopped) {
-            _state.value = WebServerState.Stopped
+            LOG.info("Stopped")
+            val downloadComplete = (state.value as? WebServerState.Stopping)?.downloadComplete ?: false
+            _state.value = WebServerState.Stopped(downloadComplete)
+            server = null
         }
     }
 
@@ -139,8 +161,11 @@ class WebserverManager @Inject constructor() {
                 Attachment.withParameter(FileName, sendPage.fileName).toString()
             )
             call.respondFile(sendPage.zipFile)
-            LOG.info("Download complete. Emitting SHOULD_STOP state...")
-            _state.value = WebServerState.DownloadComplete
+            LOG.info("Download complete.")
+            // stopping in the same coroutine context causes a hang and the server never stops
+            GlobalScope.launch(Dispatchers.IO) {
+                stop(true)
+            }
         }
     }
 }
