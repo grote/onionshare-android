@@ -1,5 +1,6 @@
 package org.onionshare.android.tor
 
+import IPtProxy.IPtProxy
 import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -125,6 +126,12 @@ class TorManager @Inject constructor(
         }
     }
 
+    init {
+        val ptStateDir = File(app.cacheDir, "pt")
+        if (!ptStateDir.exists()) ptStateDir.mkdir()
+        IPtProxy.setStateLocation(ptStateDir.absolutePath)
+    }
+
     /**
      * Starts [TorService] and creates a new onion service.
      * Suspends until the address of the onion service is available.
@@ -146,6 +153,9 @@ class TorManager @Inject constructor(
         try {
             startLatch?.await() ?: error("startLatch was null")
             startLatch = null
+
+            startSnowflakeClientDomainFronting()
+
             onTorServiceStarted()
         } catch (e: Exception) {
             LOG.warn("Error while starting Tor: ", e)
@@ -170,9 +180,27 @@ class TorManager @Inject constructor(
             app.unregisterReceiver(errorReceiver)
             broadcastReceiverRegistered = false
         }
+        IPtProxy.stopSnowflake()
         localSocket = null
         LOG.info("Stopped")
         _state.value = TorState.Stopped
+    }
+
+    private fun startSnowflakeClientDomainFronting() {
+        val target = "https://snowflake-broker.torproject.net.global.prod.fastly.net/"
+        val front = "cdn.sstatic.net"
+        val stunServer = "stun:stun.stunprotocol.org:3478"
+        IPtProxy.startSnowflake(stunServer, target, front, null,
+            null, true, false, false, 1)
+    }
+
+    private fun startSnowflakeAmp() {
+        val stunServers =
+            "stun:stun.l.google.com:19302,stun:stun.voip.blackberry.com:3478,stun:stun.altar.com.pl:3478,stun:stun.antisip.com:3478,stun:stun.bluesip.net:3478,stun:stun.dus.net:3478,stun:stun.epygi.com:3478,stun:stun.sonetel.com:3478,stun:stun.sonetel.net:3478,stun:stun.stunprotocol.org:3478,stun:stun.uls.co.za:3478,stun:stun.voipgate.com:3478,stun:stun.voys.nl:3478";
+        val target = "https://snowflake-broker.torproject.net/";
+        val front = "www.google.com";
+        val ampCache = "https://cdn.ampproject.org/";
+        IPtProxy.startSnowflake(stunServers, target, front, ampCache, null, true, false, false, 1);
     }
 
     @Throws(IOException::class, IllegalArgumentException::class)
@@ -186,6 +214,14 @@ class TorManager @Inject constructor(
             authenticate(ByteArray(0))
             takeOwnership()
             setEvents(EVENTS)
+
+            val conf = listOf(
+                "ClientTransportPlugin snowflake socks5 127.0.0.1:" + IPtProxy.snowflakePort(),
+                "UseBridges 1",
+                "Bridge snowflake 192.0.2.3:1 2B280B23E1107BB62ABFC40DDCC8824814F80A72",
+            )
+            setConf(conf)
+
             val onion = createOnionService()
             _state.value = TorState.Starting(10, onion)
         }

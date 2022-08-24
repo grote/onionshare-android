@@ -106,6 +106,7 @@ dependencies {
 
     implementation 'info.guardianproject:tor-android:0.4.6.10'
     implementation 'info.guardianproject:jtorctl:0.4.5.7'
+    implementation 'com.github.tladesignz:IPtProxy:1.7.1'
 
     def ktor_version = '2.1.0'
     implementation "io.ktor:ktor-server-core:$ktor_version"
