@@ -33,6 +33,8 @@
 # Keep Netty classes that are loaded via reflection
 -keep class io.netty.util.ReferenceCountUtil { *; }
 -keep class io.netty.buffer.WrappedByteBuf { *; }
+-keep class io.netty.channel.socket.nio.NioServerSocketChannel { *; }
+-keep class io.netty.handler.codec.MessageToMessageEncoder { *; }
 
 -dontwarn com.fasterxml.jackson.databind.ext.Java7SupportImpl
 -dontwarn io.netty.internal.tcnative.*
@@ -44,3 +46,11 @@
 -dontwarn org.jetbrains.annotations.*
 -dontwarn reactor.blockhound.integration.BlockHoundIntegration
 -dontwarn javax.mail.**
+
+# okhttp 4.x see https://github.com/square/okhttp/issues/6258
+-dontwarn org.bouncycastle.jsse.BCSSLSocket
+-dontwarn org.bouncycastle.jsse.BCSSLParameters
+-dontwarn org.bouncycastle.jsse.provider.BouncyCastleJsseProvider
+-dontwarn org.openjsse.javax.net.ssl.SSLParameters
+-dontwarn org.openjsse.javax.net.ssl.SSLSocket
+-dontwarn org.openjsse.net.ssl.OpenJSSE
