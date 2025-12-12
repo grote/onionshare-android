@@ -130,7 +130,7 @@ dependencies {
     kapt "com.google.dagger:hilt-compiler:$hilt_version"
 
     // Tor
-    implementation "org.briarproject:onionwrapper-android:0.1.3"
+    implementation "org.briarproject:onionwrapper-android:0.1.4"
     tor 'org.briarproject:tor-android:0.4.8.19'
     tor 'org.briarproject:lyrebird-android:0.6.2'
     implementation 'org.briarproject:moat-api:0.3'
