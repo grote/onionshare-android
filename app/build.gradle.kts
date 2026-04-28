@@ -3,15 +3,13 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Date
 
 plugins {
-    id("com.android.application")
-    id("com.google.devtools.ksp")
-    id("com.google.dagger.hilt.android")
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jlleitschuh.gradle.ktlint")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ktlint)
 }
 
-val hiltVersion = "2.59.2"
-val composeVersion = "2026.04.01"
 val tor by configurations.creating
 
 fun versionCodeEpoch(): Int = (Date().time / 1000).toInt()
@@ -27,7 +25,7 @@ fun gitCommit(): String {
 
 android {
     namespace = "org.onionshare.android"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "org.onionshare.android"
@@ -124,61 +122,60 @@ kotlin {
 }
 
 dependencies {
-    implementation(kotlin("reflect"))
+    implementation(libs.kotlin.reflect)
 
-    implementation("androidx.core:core-ktx:1.18.0")
-    implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("androidx.activity:activity-compose:1.13.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
-    implementation("androidx.documentfile:documentfile:1.1.0")
-    implementation("com.google.android.material:material:1.13.0")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.documentfile)
+    implementation(libs.material)
 
-    implementation(platform("androidx.compose:compose-bom:$composeVersion"))
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.extended)
+    implementation(libs.compose.ui.tooling.preview)
 
-    implementation("androidx.navigation:navigation-compose:2.9.8")
-    implementation("androidx.hilt:hilt-navigation-compose:1.3.0")
-    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
-    implementation("androidx.security:security-crypto:1.1.0")
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.profileinstaller)
+    implementation(libs.androidx.security.crypto)
 
-    implementation("com.google.dagger:hilt-android:$hiltVersion")
-    ksp("com.google.dagger:hilt-compiler:$hiltVersion")
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 
     // Tor
-    implementation("org.briarproject:onionwrapper-android:0.1.4")
-    add(tor.name, "org.briarproject:tor-android:0.4.8.22")
-    add(tor.name, "org.briarproject:lyrebird-android:0.6.2")
-    implementation("org.briarproject:moat-api:0.4")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(libs.briar.onionwrapper.android)
+    add(tor.name, libs.briar.tor.android)
+    add(tor.name, libs.briar.lyrebird.android)
+    implementation(libs.briar.moat.api)
+    implementation(libs.okhttp)
 
-    val ktorVersion = "2.3.13"
-    implementation("io.ktor:ktor-server-core:$ktorVersion")
-    implementation("io.ktor:ktor-server-netty:$ktorVersion")
-    implementation("io.ktor:ktor-server-pebble:$ktorVersion")
-    implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
-    implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
-    implementation("org.slf4j:slf4j-api:2.0.17")
-    implementation("org.slf4j:jul-to-slf4j:2.0.17")
-    implementation("com.github.tony19:logback-android:3.0.0")
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.netty)
+    implementation(libs.ktor.server.pebble)
+    implementation(libs.ktor.server.status.pages)
+    implementation(libs.ktor.server.call.logging)
+    implementation(libs.slf4j.api)
+    implementation(libs.slf4j.jul.to.slf4j)
+    implementation(libs.logback.android)
 
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("io.mockk:mockk:1.14.9")
-    testImplementation("org.slf4j:slf4j-jdk14:2.0.17")
-    testImplementation("app.cash.turbine:turbine:1.2.1")
-    testImplementation("org.jetbrains.kotlin:kotlin-test")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation(libs.junit4)
+    testImplementation(libs.mockk)
+    testImplementation(libs.slf4j.jdk14)
+    testImplementation(libs.turbine)
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlinx.coroutines.test)
 
-    androidTestImplementation("androidx.test.ext:junit:1.3.0")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.11.0")
-    androidTestImplementation("tools.fastlane:screengrab:2.1.1")
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.screengrab)
 }
 
 val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)

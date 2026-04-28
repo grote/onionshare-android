@@ -1,9 +1,16 @@
 plugins {
-    id("com.android.application") apply false
-    id("org.jetbrains.kotlin.plugin.compose") apply false
-    id("com.google.dagger.hilt.android") apply false
-    id("com.google.devtools.ksp") apply false
-    id("org.jlleitschuh.gradle.ktlint") apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.hilt.android) apply false
+    alias(libs.plugins.ksp) apply false
+    alias(libs.plugins.ktlint) apply false
+}
+
+allprojects {
+    repositories {
+        mavenCentral()
+        google()
+    }
 }
 
 tasks.register<Delete>("clean") {
