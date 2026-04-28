@@ -29,7 +29,7 @@ lyrebird-android = "0.6.2"
 moat-api = "0.4"
 
 okhttp = "4.12.0"
-ktor = "2.3.13"
+ktor = "3.4.3"
 slf4j = "2.0.17"
 logback-android = "3.0.0"
 
