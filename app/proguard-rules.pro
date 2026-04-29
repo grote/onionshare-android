@@ -33,7 +33,8 @@
 
 # Keep Netty classes that are loaded via reflection
 -keep class io.netty.channel.** { *; }
--keep class io.netty.buffer.WrappedByteBuf { *; }
+-keep class io.netty.buffer.** { *; }
+-keep class io.netty.util.concurrent.** { *; }
 -keep class io.netty.util.ReferenceCountUtil { *; }
 -keep class io.netty.handler.codec.MessageToMessageEncoder { *; }
 
