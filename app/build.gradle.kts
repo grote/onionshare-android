@@ -30,7 +30,7 @@ android {
     defaultConfig {
         applicationId = "org.onionshare.android"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 26
         versionName = "0.3.0-beta"
 
