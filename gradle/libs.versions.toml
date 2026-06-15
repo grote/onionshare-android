@@ -1,14 +1,14 @@
 [versions]
-agp = "9.2.0"
+agp = "9.2.1"
 kotlin = "2.3.21"
 hilt = "2.59.2"
 ksp = "2.3.7"
 ktlint-plugin = "10.2.1"
 
-compose-bom = "2026.04.01"
-compose-ui-test-junit4 = "1.11.0"
+compose-bom = "2026.05.01"
+compose-ui-test-junit4 = "1.11.2"
 
-androidx-core-ktx = "1.18.0"
+androidx-core-ktx = "1.19.0"
 androidx-appcompat = "1.7.1"
 androidx-activity-compose = "1.13.0"
 androidx-lifecycle-runtime-ktx = "2.10.0"
@@ -20,23 +20,23 @@ androidx-security-crypto = "1.1.0"
 androidx-test-ext-junit = "1.3.0"
 androidx-test-espresso-core = "3.7.0"
 
-material = "1.13.0"
+material = "1.14.0"
 desugar-jdk-libs = "2.1.5"
 
 onionwrapper = "0.1.4"
-tor-android = "0.4.8.22"
+tor-android = "0.4.9.9"
 lyrebird-android = "0.6.2"
 moat-api = "0.4"
 
 okhttp = "4.12.0"
 ktor = "3.4.3"
-slf4j = "2.0.17"
+slf4j = "2.0.18"
 logback-android = "3.0.0"
 
 junit4 = "4.13.2"
-mockk = "1.14.9"
+mockk = "1.14.11"
 turbine = "1.2.1"
-kotlinx-coroutines-test = "1.10.2"
+kotlinx-coroutines-test = "1.11.0"
 screengrab = "2.1.1"
 
 [plugins]
